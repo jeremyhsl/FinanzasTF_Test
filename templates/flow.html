@@ -8,7 +8,7 @@
   <div class="col-12">
     <h2 class="mb-3 text-center">Flujo de Caja - Valoración #{{ bono.id_valoracion }}</h2>
     <ul class="list-group mb-4">
-      <li class="list-group-item"><strong>Monto inicial:</strong> {{ symbol }} {{ bono.monto_bono }}</li>
+      <li class="list-group-item"><strong>Monto inicial:</strong> {{ symbol }} {{ bono.monto_bono|money }}</li>
       <li class="list-group-item"><strong>Moneda:</strong> {{ currency }}</li>
       <li class="list-group-item"><strong>Tipo de tasa:</strong> {{ rate_type }}</li>
       {% if rate_type == 'nominal' %}
@@ -18,10 +18,10 @@
       <li class="list-group-item"><strong>Tasa periódica:</strong> {{ tasa_periodica }}%</li>
       <li class="list-group-item"><strong>Periodicidad:</strong> {{ bono.periodicidad }}</li>
       <li class="list-group-item"><strong>Plazo de Gracia:</strong> {{ bono.plazo_gracia }}</li>
-      <li class="list-group-item"><strong>Precio de compra:</strong> 
-        {% if bono.precio_compra %}{{ symbol }} {{ bono.precio_compra }}{% else %}(no proporcionado){% endif %}
+      <li class="list-group-item"><strong>Precio de compra:</strong>
+        {% if bono.precio_compra %}{{ symbol }} {{ bono.precio_compra|money }}{% else %}(no proporcionado){% endif %}
       </li>
-      <li class="list-group-item"><strong>Precio máximo (VPN):</strong> {{ symbol }} {{ price_max }}</li>
+      <li class="list-group-item"><strong>Precio máximo (VPN):</strong> {{ symbol }} {{ price_max|money }}</li>
     </ul>
 
     <h3 class="mb-3">Indicadores Financieros</h3>
@@ -51,11 +51,11 @@
           {% for row in flujo %}
           <tr>
             <td>{{ row.periodo }}</td>
-            <td>{{ symbol }} {{ row.saldo_ini }}</td>
-            <td>{{ symbol }} {{ row.cuota }}</td>
-            <td>{{ symbol }} {{ row.interes }}</td>
-            <td>{{ symbol }} {{ row.amortizacion }}</td>
-            <td>{{ symbol }} {{ row.saldo_fin }}</td>
+            <td>{{ symbol }} {{ row.saldo_ini|money }}</td>
+            <td>{{ symbol }} {{ row.cuota|money }}</td>
+            <td>{{ symbol }} {{ row.interes|money }}</td>
+            <td>{{ symbol }} {{ row.amortizacion|money }}</td>
+            <td>{{ symbol }} {{ row.saldo_fin|money }}</td>
           </tr>
           {% endfor %}
         </tbody>

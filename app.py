@@ -12,6 +12,14 @@ app.secret_key = "cámbiala_por_una_clave_segura"  # Para sesiones y flash messa
 
 DB_PATH = "database.db"
 
+# Filtro para formatear montos con separador de miles
+@app.template_filter('money')
+def money_filter(value):
+    try:
+        return "{:,.2f}".format(float(value))
+    except (ValueError, TypeError):
+        return value
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()

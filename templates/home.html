@@ -31,7 +31,7 @@
       {% for v in valoraciones %}
         {% set symbol = {'PEN':'S/','USD':'$','EUR':'€'}.get(v.currency, v.currency) %}
         <tr>
-          <td>{{ symbol }} {{ v.monto_bono }}</td>
+          <td>{{ symbol }} {{ v.monto_bono|money }}</td>
           <td>{{ v.tasa_anual }}%</td>
           <td>{{ v.plazo_meses }}</td>
           <td>{{ v.periodicidad }}</td>
