@@ -224,6 +224,9 @@ def bono_flow(id_valoracion):
     if periodicidad == "trimestral":
         freq = 4
         step = 3
+    elif periodicidad == "semestral":
+        freq = 2
+        step = 6
     else:
         freq = 12
         step = 1

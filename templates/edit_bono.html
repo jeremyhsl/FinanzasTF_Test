@@ -27,6 +27,7 @@
               <label for="periodicidad" class="form-label">Periodicidad de Pago</label>
               <select class="form-select" id="periodicidad" name="periodicidad" title="Frecuencia de pagos">
                 <option value="mensual" {% if bono.periodicidad=='mensual' %}selected{% endif %}>Mensual</option>
+                <option value="semestral" {% if bono.periodicidad=='semestral' %}selected{% endif %}>Semestral</option>
                 <option value="trimestral" {% if bono.periodicidad=='trimestral' %}selected{% endif %}>Trimestral</option>
               </select>
             </div>
