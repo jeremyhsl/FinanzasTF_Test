@@ -1,17 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Mis Valoraciones{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Bienvenido, {{ session.user_name }}</h2>
-    <div>
-      <a class="btn btn-success me-2" href="{{ url_for('new_bono') }}">+ Nueva Valoración</a>
-  
-      <form action="{{ url_for('clear_valoraciones') }}" method="post" class="d-inline"
-            onsubmit="return confirm('¿Borrar todas tus valoraciones?');">
-        <button type="submit" class="btn btn-danger">🗑️ Borrar todas</button>
-      </form>
-    </div>
-  </div>
+<div class="hero text-center">
+  <h1 class="display-5 fw-bold">Bienvenido, {{ session.user_name }}</h1>
+  <p class="lead mb-4">Gestiona y valora tus bonos con facilidad</p>
+  <a class="btn btn-success me-2" href="{{ url_for('new_bono') }}">+ Nueva Valoración</a>
+  <form action="{{ url_for('clear_valoraciones') }}" method="post" class="d-inline"
+        onsubmit="return confirm('¿Borrar todas tus valoraciones?');">
+    <button type="submit" class="btn btn-danger">🗑️ Borrar todas</button>
+  </form>
+</div>
   
 
 {% if valoraciones %}

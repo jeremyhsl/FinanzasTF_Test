@@ -1,16 +1,28 @@
 body {
   font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #e8f4ff, #ffffff);
+  min-height: 100vh;
 }
 
 .navbar-brand {
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .card {
   border-radius: 0.75rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
 }
 
 table.table {
   border-radius: 0.5rem;
   overflow: hidden;
+}
+
+.hero {
+  background: linear-gradient(90deg, #12c2e9, #c471ed, #f64f59);
+  color: white;
+  padding: 4rem 2rem;
+  border-radius: 0.75rem;
+  margin-bottom: 2rem;
 }
