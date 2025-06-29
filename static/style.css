@@ -1,0 +1,16 @@
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+.navbar-brand {
+  font-weight: 500;
+}
+
+.card {
+  border-radius: 0.75rem;
+}
+
+table.table {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
