@@ -57,6 +57,33 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # nuevas tablas para flujos y resultados
+    cur.execute("""CREATE TABLE IF NOT EXISTS flujo_caja (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        valoracion_id INTEGER NOT NULL,
+        periodo INTEGER NOT NULL,
+        saldo_ini REAL,
+        cuota REAL,
+        interes REAL,
+        amortizacion REAL,
+        saldo_fin REAL,
+        FOREIGN KEY(valoracion_id) REFERENCES valoracion_bono(id_valoracion)
+    );""")
+
+    cur.execute("""CREATE TABLE IF NOT EXISTS resultados_financieros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        valoracion_id INTEGER NOT NULL UNIQUE,
+        eff_annual REAL,
+        tasa_periodica REAL,
+        price_max REAL,
+        duration REAL,
+        duration_mod REAL,
+        convexity REAL,
+        tcea REAL,
+        trea REAL,
+        FOREIGN KEY(valoracion_id) REFERENCES valoracion_bono(id_valoracion)
+    );""")
+
     conn.commit()
     conn.close()
 
@@ -78,6 +105,110 @@ def irr(cashflows, guess=0.1, tol=1e-6, maxiter=100):
             return new_rate
         rate = new_rate
     return rate
+
+def calcular_flujo_y_resultados(monto_bono, tasa_anual, plazo_meses,
+                                periodicidad, plazo_gracia, precio_compra,
+                                rate_type, capitalization):
+    """Genera el flujo de caja y los indicadores financieros."""
+    tasa_input = tasa_anual / 100.0
+
+    if periodicidad == "trimestral":
+        freq = 4
+        step = 3
+    elif periodicidad == "semestral":
+        freq = 2
+        step = 6
+    else:
+        freq = 12
+        step = 1
+
+    if rate_type == "efectiva":
+        i = (1 + tasa_input) ** (1 / freq) - 1
+        eff_annual = tasa_input
+    else:
+        m = capitalization or freq
+        eff_annual = (1 + tasa_input / m) ** m - 1
+        i = (1 + eff_annual) ** (1 / freq) - 1
+
+    total_periods = math.ceil(plazo_meses / step)
+
+    flujo = []
+    saldo = monto_bono
+    start = 1
+
+    if plazo_gracia == "parcial":
+        interes0 = saldo * i
+        flujo.append({
+            "periodo": 1,
+            "saldo_ini": round(saldo, 2),
+            "cuota": round(interes0, 2),
+            "interes": round(interes0, 2),
+            "amortizacion": 0.0,
+            "saldo_fin": round(saldo, 2),
+        })
+        n_rest = total_periods - 1
+        cuota = saldo * (i / (1 - (1 + i) ** (-n_rest)))
+        start = 2
+    elif plazo_gracia == "total":
+        interes0 = saldo * i
+        saldo += interes0
+        flujo.append({
+            "periodo": 1,
+            "saldo_ini": round(monto_bono, 2),
+            "cuota": 0.0,
+            "interes": round(interes0, 2),
+            "amortizacion": 0.0,
+            "saldo_fin": round(saldo, 2),
+        })
+        n_rest = total_periods - 1
+        cuota = saldo * (i / (1 - (1 + i) ** (-n_rest)))
+        start = 2
+    else:
+        cuota = monto_bono * (i / (1 - (1 + i) ** (-total_periods)))
+
+    for t in range(start, total_periods + 1):
+        interes = saldo * i
+        amortiza = cuota - interes
+        saldo_fin = saldo - amortiza
+        flujo.append({
+            "periodo": t,
+            "saldo_ini": round(saldo, 2),
+            "cuota": round(cuota, 2),
+            "interes": round(interes, 2),
+            "amortizacion": round(amortiza, 2),
+            "saldo_fin": round(saldo_fin, 2),
+        })
+        saldo = saldo_fin
+
+    pv_flows = [row["cuota"] / ((1 + i) ** row["periodo"]) for row in flujo]
+    price_max = round(sum(pv_flows), 2)
+
+    duration = sum(row["periodo"] * pv for row, pv in zip(flujo, pv_flows)) / price_max
+    duration_mod = duration / (1 + i)
+    convexity = sum(
+        row["cuota"] * row["periodo"] * (row["periodo"] + 1) /
+        ((1 + i) ** (row["periodo"] + 2))
+        for row in flujo
+    ) / price_max
+    tcea = (1 + i) ** freq - 1
+
+    trea = None
+    if precio_compra:
+        cfs = [-precio_compra] + [row["cuota"] for row in flujo]
+        tir_p = irr(cfs)
+        trea = (1 + tir_p) ** freq - 1
+
+    resultados = {
+        "eff_annual": eff_annual,
+        "tasa_periodica": i,
+        "price_max": price_max,
+        "duration": duration,
+        "duration_mod": duration_mod,
+        "convexity": convexity,
+        "tcea": tcea,
+        "trea": trea,
+    }
+    return flujo, resultados
 
 @app.route("/test")
 def test():
@@ -179,19 +310,76 @@ def new_bono():
         capitalization= int(request.form["capitalization"]) if rate_type == "nominal" else None
 
         db = get_db()
-        db.execute("""
+        cur = db.execute(
+            """
             INSERT INTO valoracion_bono
             (user_id, monto_bono, tasa_anual, plazo_meses,
              periodicidad, plazo_gracia, metodo, precio_compra,
              currency, rate_type, capitalization)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, monto_bono, tasa_anual, plazo_meses,
-            periodicidad, plazo_gracia,
-            "frances",
+            """,
+            (
+                user_id,
+                monto_bono,
+                tasa_anual,
+                plazo_meses,
+                periodicidad,
+                plazo_gracia,
+                "frances",
+                precio_compra,
+                currency,
+                rate_type,
+                capitalization,
+            ),
+        )
+        valoracion_id = cur.lastrowid
+
+        flujo, resultados = calcular_flujo_y_resultados(
+            monto_bono,
+            tasa_anual,
+            plazo_meses,
+            periodicidad,
+            plazo_gracia,
             precio_compra,
-            currency, rate_type, capitalization
-        ))
+            rate_type,
+            capitalization,
+        )
+
+        for row in flujo:
+            db.execute(
+                """INSERT INTO flujo_caja
+                    (valoracion_id, periodo, saldo_ini, cuota, interes,
+                     amortizacion, saldo_fin)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    valoracion_id,
+                    row["periodo"],
+                    row["saldo_ini"],
+                    row["cuota"],
+                    row["interes"],
+                    row["amortizacion"],
+                    row["saldo_fin"],
+                ),
+            )
+
+        db.execute(
+            """INSERT INTO resultados_financieros
+                (valoracion_id, eff_annual, tasa_periodica, price_max,
+                 duration, duration_mod, convexity, tcea, trea)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                valoracion_id,
+                resultados["eff_annual"],
+                resultados["tasa_periodica"],
+                resultados["price_max"],
+                resultados["duration"],
+                resultados["duration_mod"],
+                resultados["convexity"],
+                resultados["tcea"],
+                resultados["trea"],
+            ),
+        )
+
         db.commit()
         flash("Valoración de bono creada correctamente.")
         return redirect(url_for("home"))
@@ -203,12 +391,10 @@ def new_bono():
 
 @app.route("/bono/<int:id_valoracion>/flow")
 def bono_flow(id_valoracion):
-    # 1) Autenticación
     if "user_id" not in session:
         flash("Debes iniciar sesión primero.")
         return redirect(url_for("login"))
 
-    # 2) Recuperar datos de la valoración
     db = get_db()
     bono = db.execute(
         "SELECT * FROM valoracion_bono WHERE id_valoracion = ? AND user_id = ?",
@@ -218,136 +404,34 @@ def bono_flow(id_valoracion):
         flash("Valoración no encontrada.")
         return redirect(url_for("home"))
 
-    # 3) Parametros básicos
-    P = bono["monto_bono"]
-    tasa_input = bono["tasa_anual"] / 100.0
-    periodicidad = bono["periodicidad"]
-    plazo_gracia = bono["plazo_gracia"]
-    precio_compra = bono["precio_compra"]
-    currency = bono["currency"]
-    rate_type = bono["rate_type"]
-    capitalization = bono["capitalization"]
+    flujo = db.execute(
+        "SELECT * FROM flujo_caja WHERE valoracion_id = ? ORDER BY periodo",
+        (id_valoracion,)
+    ).fetchall()
+    resultados = db.execute(
+        "SELECT * FROM resultados_financieros WHERE valoracion_id = ?",
+        (id_valoracion,)
+    ).fetchone()
 
-    # 4) Frecuencia de pagos
-    if periodicidad == "trimestral":
-        freq = 4
-        step = 3
-    elif periodicidad == "semestral":
-        freq = 2
-        step = 6
-    else:
-        freq = 12
-        step = 1
-
-    # 5) Conversión de tasa según tipo
-    if rate_type == "efectiva":
-        # Tasa periódica directa desde tasa efectiva anual
-        i = (1 + tasa_input) ** (1 / freq) - 1
-        eff_annual = tasa_input
-    else:
-        # Tasa nominal con m capitalizaciones al año
-        m = capitalization or freq
-        eff_annual = (1 + tasa_input / m) ** m - 1
-        i = (1 + eff_annual) ** (1 / freq) - 1
-
-    # 6) Total de periodos
-    total_periods = math.ceil(bono["plazo_meses"] / step)
-
-    # 7) Generar flujo de caja (método francés)
-    flujo = []
-    saldo = P
-    start = 1
-
-    # 7a) Gracia parcial: 1er periodo solo interés
-    if plazo_gracia == "parcial":
-        interes0 = saldo * i
-        flujo.append({
-            "periodo": 1,
-            "saldo_ini": round(saldo, 2),
-            "cuota": round(interes0, 2),
-            "interes": round(interes0, 2),
-            "amortizacion": 0.0,
-            "saldo_fin": round(saldo, 2)
-        })
-        n_rest = total_periods - 1
-        cuota = saldo * (i / (1 - (1 + i) ** (-n_rest)))
-        start = 2
-
-    # 7b) Gracia total: capitalizar interés en 1er periodo
-    elif plazo_gracia == "total":
-        interes0 = saldo * i
-        saldo += interes0
-        flujo.append({
-            "periodo": 1,
-            "saldo_ini": round(P, 2),
-            "cuota": 0.0,
-            "interes": round(interes0, 2),
-            "amortizacion": 0.0,
-            "saldo_fin": round(saldo, 2)
-        })
-        n_rest = total_periods - 1
-        cuota = saldo * (i / (1 - (1 + i) ** (-n_rest)))
-        start = 2
-
-    # 7c) Sin gracia
-    else:
-        cuota = P * (i / (1 - (1 + i) ** (-total_periods)))
-
-    # 7d) Resto de periodos
-    for t in range(start, total_periods + 1):
-        interes    = saldo * i
-        amortiza   = cuota - interes
-        saldo_fin  = saldo - amortiza
-        flujo.append({
-            "periodo":      t,
-            "saldo_ini":    round(saldo, 2),
-            "cuota":        round(cuota, 2),
-            "interes":      round(interes, 2),
-            "amortizacion": round(amortiza, 2),
-            "saldo_fin":    round(saldo_fin, 2)
-        })
-        saldo = saldo_fin
-
-    # 8) Precio máximo de mercado (VPN)
-    pv_flows = [row["cuota"] / ((1 + i) ** row["periodo"]) for row in flujo]
-    price_max = round(sum(pv_flows), 2)
-
-    # 9) Duración Macaulay
-    duration = sum(row["periodo"] * pv for row, pv in zip(flujo, pv_flows)) / price_max
-    # 10) Duración modificada
-    duration_mod = duration / (1 + i)
-    # 11) Convexidad
-    convexity = sum(
-        row["cuota"] * row["periodo"] * (row["periodo"] + 1) /
-        ((1 + i) ** (row["periodo"] + 2))
-        for row in flujo
-    ) / price_max
-
-    # 12) TCEA emisor
-    tcea = (1 + i) ** freq - 1
-
-    # 13) TREA inversor (si hay precio de compra)
-    trea = None
-    if precio_compra:
-        cfs = [-precio_compra] + [row["cuota"] for row in flujo]
-        tir_p = irr(cfs)
-        trea = (1 + tir_p) ** freq - 1
-
-    # 14) Renderizar plantilla
-    return render_template("flow.html",
+    return render_template(
+        "flow.html",
         bono=bono,
         flujo=flujo,
-        currency=currency,
-        rate_type=rate_type,
-        capitalization=capitalization,
-        eff_annual=round(eff_annual * 100, 4),
-        tasa_periodica=round(i * 100, 4),
-        price_max=price_max,
-        duration=round(duration, 4),
-        duration_mod=round(duration_mod, 4),
-        convexity=round(convexity, 4),
-        tcea=round(tcea * 100, 4),
-        trea=(round(trea * 100, 4) if trea is not None else None)
+        currency=bono["currency"],
+        rate_type=bono["rate_type"],
+        capitalization=bono["capitalization"],
+        eff_annual=round(resultados["eff_annual"] * 100, 4),
+        tasa_periodica=round(resultados["tasa_periodica"] * 100, 4),
+        price_max=resultados["price_max"],
+        duration=round(resultados["duration"], 4),
+        duration_mod=round(resultados["duration_mod"], 4),
+        convexity=round(resultados["convexity"], 4),
+        tcea=round(resultados["tcea"] * 100, 4),
+        trea=(
+            round(resultados["trea"] * 100, 4)
+            if resultados["trea"] is not None
+            else None
+        )
     )
 
 @app.route("/bono/<int:id_valoracion>/edit", methods=["GET", "POST"])
@@ -376,7 +460,8 @@ def edit_bono(id_valoracion):
         rate_type      = request.form["rate_type"]
         capitalization = int(request.form["capitalization"]) if rate_type == "nominal" else None
 
-        db.execute("""
+        db.execute(
+            """
             UPDATE valoracion_bono SET
                 monto_bono     = ?,
                 tasa_anual     = ?,
@@ -388,12 +473,77 @@ def edit_bono(id_valoracion):
                 rate_type      = ?,
                 capitalization = ?
             WHERE id_valoracion = ? AND user_id = ?
-        """, (
-            monto_bono, tasa_anual, plazo_meses,
-            periodicidad, plazo_gracia, precio_compra,
-            currency, rate_type, capitalization,
-            id_valoracion, session["user_id"]
-        ))
+            """,
+            (
+                monto_bono,
+                tasa_anual,
+                plazo_meses,
+                periodicidad,
+                plazo_gracia,
+                precio_compra,
+                currency,
+                rate_type,
+                capitalization,
+                id_valoracion,
+                session["user_id"],
+            ),
+        )
+
+        db.execute(
+            "DELETE FROM flujo_caja WHERE valoracion_id = ?",
+            (id_valoracion,),
+        )
+        db.execute(
+            "DELETE FROM resultados_financieros WHERE valoracion_id = ?",
+            (id_valoracion,),
+        )
+
+        flujo, resultados = calcular_flujo_y_resultados(
+            monto_bono,
+            tasa_anual,
+            plazo_meses,
+            periodicidad,
+            plazo_gracia,
+            precio_compra,
+            rate_type,
+            capitalization,
+        )
+
+        for row in flujo:
+            db.execute(
+                """INSERT INTO flujo_caja
+                    (valoracion_id, periodo, saldo_ini, cuota, interes,
+                     amortizacion, saldo_fin)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    id_valoracion,
+                    row["periodo"],
+                    row["saldo_ini"],
+                    row["cuota"],
+                    row["interes"],
+                    row["amortizacion"],
+                    row["saldo_fin"],
+                ),
+            )
+
+        db.execute(
+            """INSERT INTO resultados_financieros
+                (valoracion_id, eff_annual, tasa_periodica, price_max,
+                 duration, duration_mod, convexity, tcea, trea)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                id_valoracion,
+                resultados["eff_annual"],
+                resultados["tasa_periodica"],
+                resultados["price_max"],
+                resultados["duration"],
+                resultados["duration_mod"],
+                resultados["convexity"],
+                resultados["tcea"],
+                resultados["trea"],
+            ),
+        )
+
         db.commit()
         flash("Valoración actualizada correctamente.")
         return redirect(url_for("home"))
@@ -407,9 +557,14 @@ def delete_bono(id_valoracion):
         flash("Debes iniciar sesión primero.")
         return redirect(url_for("login"))
     db = get_db()
+    db.execute("DELETE FROM flujo_caja WHERE valoracion_id = ?", (id_valoracion,))
+    db.execute(
+        "DELETE FROM resultados_financieros WHERE valoracion_id = ?",
+        (id_valoracion,),
+    )
     db.execute(
         "DELETE FROM valoracion_bono WHERE id_valoracion = ? AND user_id = ?",
-        (id_valoracion, session["user_id"])
+        (id_valoracion, session["user_id"]),
     )
     db.commit()
     flash("Valoración eliminada correctamente.")
@@ -428,7 +583,18 @@ def clear_valoraciones():
         flash("Debes iniciar sesión primero.")
         return redirect(url_for("login"))
     db = get_db()
-    db.execute("DELETE FROM valoracion_bono WHERE user_id = ?", (session["user_id"],))
+    db.execute(
+        "DELETE FROM flujo_caja WHERE valoracion_id IN (SELECT id_valoracion FROM valoracion_bono WHERE user_id = ?)",
+        (session["user_id"],),
+    )
+    db.execute(
+        "DELETE FROM resultados_financieros WHERE valoracion_id IN (SELECT id_valoracion FROM valoracion_bono WHERE user_id = ?)",
+        (session["user_id"],),
+    )
+    db.execute(
+        "DELETE FROM valoracion_bono WHERE user_id = ?",
+        (session["user_id"],),
+    )
     db.commit()
     flash("Todas tus valoraciones han sido eliminadas.")
     return redirect(url_for("home"))
@@ -440,7 +606,4 @@ def help_page():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-app = Flask(__name__)
-app.secret_key = "cámbiala_por_una_clave_segura"
 
