@@ -20,9 +20,10 @@ table.table {
 }
 
 .hero {
-  background: linear-gradient(90deg, #12c2e9, #c471ed, #f64f59);
-  color: white;
+  background: linear-gradient(135deg, #c2e9fb, #f9f9f9);
+  color: #333;
   padding: 4rem 2rem;
   border-radius: 0.75rem;
   margin-bottom: 2rem;
+  text-align: center;
 }
