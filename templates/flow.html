@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Flujo de Caja{% endblock %}
+{% block content %}
+{% set sym_map = {'PEN':'S/','USD':'$','EUR':'€'} %}
+{% set symbol = sym_map.get(currency, '') %}
+
+<div class="row justify-content-center">
+  <div class="col-12">
+    <h2 class="mb-3 text-center">Flujo de Caja - Valoración #{{ bono.id_valoracion }}</h2>
+    <ul class="list-group mb-4">
+      <li class="list-group-item"><strong>Monto inicial:</strong> {{ symbol }} {{ bono.monto_bono }}</li>
+      <li class="list-group-item"><strong>Moneda:</strong> {{ currency }}</li>
+      <li class="list-group-item"><strong>Tipo de tasa:</strong> {{ rate_type }}</li>
+      {% if rate_type == 'nominal' %}
+      <li class="list-group-item"><strong>Capitalización:</strong> {{ capitalization }} períodos/año</li>
+      {% endif %}
+      <li class="list-group-item"><strong>Tasa efectiva anual:</strong> {{ eff_annual }}%</li>
+      <li class="list-group-item"><strong>Tasa periódica:</strong> {{ tasa_periodica }}%</li>
+      <li class="list-group-item"><strong>Periodicidad:</strong> {{ bono.periodicidad }}</li>
+      <li class="list-group-item"><strong>Plazo de Gracia:</strong> {{ bono.plazo_gracia }}</li>
+      <li class="list-group-item"><strong>Precio de compra:</strong> 
+        {% if bono.precio_compra %}{{ symbol }} {{ bono.precio_compra }}{% else %}(no proporcionado){% endif %}
+      </li>
+      <li class="list-group-item"><strong>Precio máximo (VPN):</strong> {{ symbol }} {{ price_max }}</li>
+    </ul>
+
+    <h3 class="mb-3">Indicadores Financieros</h3>
+    <ul class="list-group mb-4">
+      <li class="list-group-item"><strong>TCEA (Emisor):</strong> {{ tcea }}% anual</li>
+      <li class="list-group-item"><strong>TREA (Inversor):</strong> 
+        {% if trea is not none %}{{ trea }}% anual{% else %}(requiere precio de compra){% endif %}
+      </li>
+      <li class="list-group-item"><strong>Duración Macaulay:</strong> {{ duration }} períodos</li>
+      <li class="list-group-item"><strong>Duración Modificada:</strong> {{ duration_mod }} períodos</li>
+      <li class="list-group-item"><strong>Convexidad:</strong> {{ convexity }}</li>
+    </ul>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+          <tr>
+            <th>Periodo</th>
+            <th>Saldo Inicial</th>
+            <th>Cuota</th>
+            <th>Interés</th>
+            <th>Amortización</th>
+            <th>Saldo Final</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in flujo %}
+          <tr>
+            <td>{{ row.periodo }}</td>
+            <td>{{ symbol }} {{ row.saldo_ini }}</td>
+            <td>{{ symbol }} {{ row.cuota }}</td>
+            <td>{{ symbol }} {{ row.interes }}</td>
+            <td>{{ symbol }} {{ row.amortizacion }}</td>
+            <td>{{ symbol }} {{ row.saldo_fin }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-center mt-4">
+      <a class="btn btn-secondary" href="{{ url_for('home') }}">← Volver al Inicio</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

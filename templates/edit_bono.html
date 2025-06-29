@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Editar Valoración{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h2 class="card-title mb-4 text-center">Editar Valoración #{{ bono.id_valoracion }}</h2>
+        <form action="{{ url_for('edit_bono', id_valoracion=bono.id_valoracion) }}" method="post">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="monto_bono" class="form-label">Monto del Bono</label>
+              <input type="number" class="form-control" id="monto_bono" name="monto_bono" step="0.01" required
+                     value="{{ bono.monto_bono }}" title="Importe nominal del bono">
+            </div>
+            <div class="col-md-6">
+              <label for="tasa_anual" class="form-label">Tasa Anual (%)</label>
+              <input type="number" class="form-control" id="tasa_anual" name="tasa_anual" step="0.01" required
+                     value="{{ bono.tasa_anual }}" title="Tasa de interés anual">
+            </div>
+            <div class="col-md-4">
+              <label for="plazo_meses" class="form-label">Plazo (meses)</label>
+              <input type="number" class="form-control" id="plazo_meses" name="plazo_meses" required
+                     value="{{ bono.plazo_meses }}" title="Duración del bono en meses">
+            </div>
+            <div class="col-md-4">
+              <label for="periodicidad" class="form-label">Periodicidad de Pago</label>
+              <select class="form-select" id="periodicidad" name="periodicidad" title="Frecuencia de pagos">
+                <option value="mensual" {% if bono.periodicidad=='mensual' %}selected{% endif %}>Mensual</option>
+                <option value="trimestral" {% if bono.periodicidad=='trimestral' %}selected{% endif %}>Trimestral</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="plazo_gracia" class="form-label">Plazo de Gracia</label>
+              <select class="form-select" id="plazo_gracia" name="plazo_gracia" title="Tipo de periodo de gracia">
+                <option value="ninguno" {% if bono.plazo_gracia=='ninguno' %}selected{% endif %}>Ninguno</option>
+                <option value="parcial" {% if bono.plazo_gracia=='parcial' %}selected{% endif %}>Parcial</option>
+                <option value="total" {% if bono.plazo_gracia=='total' %}selected{% endif %}>Total</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="precio_compra" class="form-label">Precio de Compra (opcional)</label>
+              <input type="number" class="form-control" id="precio_compra" name="precio_compra" step="0.01"
+                     value="{{ bono.precio_compra }}" title="Precio que paga el inversor">
+            </div>
+            <div class="col-md-6">
+              <label for="currency" class="form-label">Moneda</label>
+              <select class="form-select" id="currency" name="currency" title="Selecciona moneda">
+                <option value="PEN" {% if bono.currency=='PEN' %}selected{% endif %}>Soles (PEN)</option>
+                <option value="USD" {% if bono.currency=='USD' %}selected{% endif %}>Dólares (USD)</option>
+                <option value="EUR" {% if bono.currency=='EUR' %}selected{% endif %}>Euros (EUR)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="rate_type" class="form-label">Tipo de Tasa</label>
+              <select class="form-select" id="rate_type" name="rate_type" onchange="toggleCap();" title="Efectiva o nominal anual">
+                <option value="efectiva" {% if bono.rate_type=='efectiva' %}selected{% endif %}>Efectiva anual</option>
+                <option value="nominal" {% if bono.rate_type=='nominal' %}selected{% endif %}>Nominal anual</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="cap_block" style="display: {{ 'block' if bono.rate_type=='nominal' else 'none' }};">
+              <label for="capitalization" class="form-label">Capitalización (periodos/año)</label>
+              <select class="form-select" id="capitalization" name="capitalization" title="# de capitalizaciones al año">
+                {% for m,label in [(1,'Anual'),(2,'Semestral'),(4,'Trimestral'),(12,'Mensual')] %}
+                <option value="{{ m }}" {% if bono.capitalization==m %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <script>
+            function toggleCap() {
+              var rt = document.getElementById('rate_type').value;
+              document.getElementById('cap_block').style.display = rt==='nominal' ? 'block' : 'none';
+            }
+          </script>
+
+          <div class="mt-4 text-center">
+            <button type="submit" class="btn btn-warning px-5">Actualizar Valoración</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

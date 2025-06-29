@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Ayuda{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10 col-lg-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h2 class="card-title mb-3">Guía de Ayuda</h2>
+        <p class="mb-4">Esta página te explica el propósito de cada campo al crear o editar una valoración de bono.</p>
+        <dl class="row">
+          <dt class="col-sm-4">Monto del Bono</dt>
+          <dd class="col-sm-8">Importe nominal del bono en la moneda seleccionada.</dd>
+
+          <dt class="col-sm-4">Tasa Anual (%)</dt>
+          <dd class="col-sm-8">Tasa de interés anual ingresada por el emisor. Se convierte a tasas periódicas.</dd>
+
+          <dt class="col-sm-4">Plazo (meses)</dt>
+          <dd class="col-sm-8">Duración total del bono, en meses.</dd>
+
+          <dt class="col-sm-4">Periodicidad de Pago</dt>
+          <dd class="col-sm-8">Frecuencia con la que se realizan los pagos: mensual o trimestral.</dd>
+
+          <dt class="col-sm-4">Plazo de Gracia</dt>
+          <dd class="col-sm-8">
+            <ul class="mb-0">
+              <li><strong>Ninguno</strong>: pagos normales desde el primer periodo.</li>
+              <li><strong>Parcial</strong>: primer periodo solo paga intereses.</li>
+              <li><strong>Total</strong>: primer periodo capitaliza el interés.</li>
+            </ul>
+          </dd>
+
+          <dt class="col-sm-4">Precio de Compra</dt>
+          <dd class="col-sm-8">Precio que el inversor paga por el bono. Necesario para calcular la TREA.</dd>
+
+          <dt class="col-sm-4">Moneda</dt>
+          <dd class="col-sm-8">Elige Soles, Dólares o Euros para mostrar el símbolo correcto.</dd>
+
+          <dt class="col-sm-4">Tipo de Tasa</dt>
+          <dd class="col-sm-8">
+            <ul class="mb-0">
+              <li><strong>Efectiva anual</strong>: la tasa ingresada es ya efectiva.</li>
+              <li><strong>Nominal anual</strong>: se capitaliza según el valor de capitalización.</li>
+            </ul>
+          </dd>
+
+          <dt class="col-sm-4">Capitalización</dt>
+          <dd class="col-sm-8">Número de veces al año que se capitaliza la tasa nominal (anual, semestral, trimestral, mensual).</dd>
+        </dl>
+        <div class="text-center mt-4">
+          <a class="btn btn-secondary" href="{{ url_for('home') }}">← Volver al Inicio</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

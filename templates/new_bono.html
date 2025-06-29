@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Valoración de Bono{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h2 class="card-title mb-4 text-center">Crear Valoración de Bono</h2>
+        <form action="{{ url_for('new_bono') }}" method="post">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="monto_bono" class="form-label">Monto del Bono</label>
+              <input type="number" class="form-control" id="monto_bono" name="monto_bono" step="0.01" required title="Importe nominal del bono">
+            </div>
+            <div class="col-md-6">
+              <label for="tasa_anual" class="form-label">Tasa Anual (%)</label>
+              <input type="number" class="form-control" id="tasa_anual" name="tasa_anual" step="0.01" required title="Tasa de interés anual">
+            </div>
+            <div class="col-md-4">
+              <label for="plazo_meses" class="form-label">Plazo (meses)</label>
+              <input type="number" class="form-control" id="plazo_meses" name="plazo_meses" required title="Duración del bono en meses">
+            </div>
+            <div class="col-md-4">
+              <label for="periodicidad" class="form-label">Periodicidad de Pago</label>
+              <select class="form-select" id="periodicidad" name="periodicidad" title="Frecuencia de pagos">
+                <option value="mensual">Mensual</option>
+                <option value="trimestral">Trimestral</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="plazo_gracia" class="form-label">Plazo de Gracia</label>
+              <select class="form-select" id="plazo_gracia" name="plazo_gracia" title="Tipo de periodo de gracia">
+                <option value="ninguno">Ninguno</option>
+                <option value="parcial">Parcial</option>
+                <option value="total">Total</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="precio_compra" class="form-label">Precio de Compra (opcional)</label>
+              <input type="number" class="form-control" id="precio_compra" name="precio_compra" step="0.01" title="Precio que paga el inversor">
+            </div>
+            <div class="col-md-6">
+              <label for="currency" class="form-label">Moneda</label>
+              <select class="form-select" id="currency" name="currency" title="Selecciona moneda">
+                <option value="PEN">Soles (PEN)</option>
+                <option value="USD">Dólares (USD)</option>
+                <option value="EUR">Euros (EUR)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="rate_type" class="form-label">Tipo de Tasa</label>
+              <select class="form-select" id="rate_type" name="rate_type" onchange="toggleCap();" title="Efectiva o nominal anual">
+                <option value="efectiva">Efectiva anual</option>
+                <option value="nominal">Nominal anual</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="cap_block" style="display: none;">
+              <label for="capitalization" class="form-label">Capitalización (periodos/año)</label>
+              <select class="form-select" id="capitalization" name="capitalization" title="# de capitalizaciones al año">
+                <option value="1">Anual</option>
+                <option value="2">Semestral</option>
+                <option value="4">Trimestral</option>
+                <option value="12">Mensual</option>
+              </select>
+            </div>
+          </div>
+          <script>
+            function toggleCap() {
+              var rt = document.getElementById('rate_type').value;
+              document.getElementById('cap_block').style.display = rt==='nominal' ? 'block' : 'none';
+            }
+          </script>
+          <div class="mt-4 text-center">
+            <button type="submit" class="btn btn-primary px-5">Guardar Valoración</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
