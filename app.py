@@ -237,14 +237,12 @@ def register():
         # hasheamos la contraseña
         password = hashlib.sha256(request.form["password"].encode()).hexdigest()
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
-            cur.execute(
+            db = get_db()
+            db.execute(
                 "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-                (name, email, password)
+                (name, email, password),
             )
-            conn.commit()
-            conn.close()
+            db.commit()
             flash("Registro exitoso. Ahora puedes iniciar sesión.")
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
@@ -257,14 +255,11 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = hashlib.sha256(request.form["password"].encode()).hexdigest()
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
-        cur.execute(
+        db = get_db()
+        user = db.execute(
             "SELECT id, name FROM users WHERE email = ? AND password = ?",
-            (email, password)
-        )
-        user = cur.fetchone()
-        conn.close()
+            (email, password),
+        ).fetchone()
         if user:
             session["user_id"] = user[0]
             session["user_name"] = user[1]
@@ -274,8 +269,6 @@ def login():
             flash("Credenciales incorrectas.")
             return redirect(url_for("login"))
     return render_template("login.html")
-
-from flask import g
 
 def get_db():
     if 'db' not in g:
@@ -605,5 +598,7 @@ def help_page():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    debug_env = os.environ.get("DEBUG", "false").lower() in ("1", "true", "yes")
+    app.run(host="0.0.0.0", port=port, debug=debug_env)
 
