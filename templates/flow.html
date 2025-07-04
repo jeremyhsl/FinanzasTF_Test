@@ -40,6 +40,7 @@
         <thead class="table-dark">
           <tr>
             <th>Periodo</th>
+            <th>Fecha Pago</th>
             <th>Saldo Inicial</th>
             <th>Cuota</th>
             <th>Interés</th>
@@ -51,6 +52,7 @@
           {% for row in flujo %}
           <tr>
             <td>{{ row.periodo }}</td>
+            <td>{{ row.fecha_pago }}</td>
             <td>{{ symbol }} {{ row.saldo_ini|money }}</td>
             <td>{{ symbol }} {{ row.cuota|money }}</td>
             <td>{{ symbol }} {{ row.interes|money }}</td>

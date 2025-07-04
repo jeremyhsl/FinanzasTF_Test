@@ -24,6 +24,10 @@
                      value="{{ bono.plazo_meses }}" title="Duración del bono en meses">
             </div>
             <div class="col-md-4">
+              <label for="start_date" class="form-label">Fecha de Emisión</label>
+              <input type="date" class="form-control" id="start_date" name="start_date" value="{{ bono.start_date }}" required>
+            </div>
+            <div class="col-md-4">
               <label for="periodicidad" class="form-label">Periodicidad de Pago</label>
               <select class="form-select" id="periodicidad" name="periodicidad" title="Frecuencia de pagos">
                 <option value="mensual" {% if bono.periodicidad=='mensual' %}selected{% endif %}>Mensual</option>
