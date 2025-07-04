@@ -2,6 +2,8 @@ import math
 import sqlite3
 import hashlib
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g
+from datetime import datetime, date
+import calendar
 
 
 import os
@@ -41,6 +43,7 @@ def init_db():
         plazo_gracia    TEXT NOT NULL,
         metodo          TEXT NOT NULL,
         precio_compra   REAL,
+        start_date     TEXT,
         FOREIGN KEY(user_id) REFERENCES users(id)
     );""")
     # añade columnas nuevas si no existían:
@@ -56,12 +59,17 @@ def init_db():
         cur.execute("ALTER TABLE valoracion_bono ADD COLUMN capitalization INTEGER DEFAULT 12")
     except sqlite3.OperationalError:
         pass
+    try:
+        cur.execute("ALTER TABLE valoracion_bono ADD COLUMN start_date TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     # nuevas tablas para flujos y resultados
     cur.execute("""CREATE TABLE IF NOT EXISTS flujo_caja (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         valoracion_id INTEGER NOT NULL,
         periodo INTEGER NOT NULL,
+        fecha_pago TEXT,
         saldo_ini REAL,
         cuota REAL,
         interes REAL,
@@ -69,6 +77,10 @@ def init_db():
         saldo_fin REAL,
         FOREIGN KEY(valoracion_id) REFERENCES valoracion_bono(id_valoracion)
     );""")
+    try:
+        cur.execute("ALTER TABLE flujo_caja ADD COLUMN fecha_pago TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     cur.execute("""CREATE TABLE IF NOT EXISTS resultados_financieros (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,11 +118,18 @@ def irr(cashflows, guess=0.1, tol=1e-6, maxiter=100):
         rate = new_rate
     return rate
 
+def add_months(d, months):
+    year = d.year + (d.month - 1 + months) // 12
+    month = (d.month - 1 + months) % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
 def calcular_flujo_y_resultados(monto_bono, tasa_anual, plazo_meses,
                                 periodicidad, plazo_gracia, precio_compra,
-                                rate_type, capitalization):
+                                rate_type, capitalization, start_date):
     """Genera el flujo de caja y los indicadores financieros."""
     tasa_input = tasa_anual / 100.0
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
 
     if periodicidad == "trimestral":
         freq = 4
@@ -140,6 +159,7 @@ def calcular_flujo_y_resultados(monto_bono, tasa_anual, plazo_meses,
         interes0 = saldo * i
         flujo.append({
             "periodo": 1,
+            "fecha_pago": add_months(start_dt, step * 1).isoformat(),
             "saldo_ini": round(saldo, 2),
             "cuota": round(interes0, 2),
             "interes": round(interes0, 2),
@@ -154,6 +174,7 @@ def calcular_flujo_y_resultados(monto_bono, tasa_anual, plazo_meses,
         saldo += interes0
         flujo.append({
             "periodo": 1,
+            "fecha_pago": add_months(start_dt, step * 1).isoformat(),
             "saldo_ini": round(monto_bono, 2),
             "cuota": 0.0,
             "interes": round(interes0, 2),
@@ -172,6 +193,7 @@ def calcular_flujo_y_resultados(monto_bono, tasa_anual, plazo_meses,
         saldo_fin = saldo - amortiza
         flujo.append({
             "periodo": t,
+            "fecha_pago": add_months(start_dt, step * t).isoformat(),
             "saldo_ini": round(saldo, 2),
             "cuota": round(cuota, 2),
             "interes": round(interes, 2),
@@ -297,6 +319,8 @@ def new_bono():
         plazo_gracia  = request.form["plazo_gracia"]
         precio_compra = float(request.form["precio_compra"]) if request.form["precio_compra"] else None
 
+        start_date    = request.form["start_date"]
+
         # nuevos campos
         currency      = request.form["currency"]
         rate_type     = request.form["rate_type"]
@@ -308,8 +332,8 @@ def new_bono():
             INSERT INTO valoracion_bono
             (user_id, monto_bono, tasa_anual, plazo_meses,
              periodicidad, plazo_gracia, metodo, precio_compra,
-             currency, rate_type, capitalization)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             currency, rate_type, capitalization, start_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -323,6 +347,7 @@ def new_bono():
                 currency,
                 rate_type,
                 capitalization,
+                start_date,
             ),
         )
         valoracion_id = cur.lastrowid
@@ -336,17 +361,19 @@ def new_bono():
             precio_compra,
             rate_type,
             capitalization,
+            start_date,
         )
 
         for row in flujo:
             db.execute(
                 """INSERT INTO flujo_caja
-                    (valoracion_id, periodo, saldo_ini, cuota, interes,
+                    (valoracion_id, periodo, fecha_pago, saldo_ini, cuota, interes,
                      amortizacion, saldo_fin)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     valoracion_id,
                     row["periodo"],
+                    row["fecha_pago"],
                     row["saldo_ini"],
                     row["cuota"],
                     row["interes"],
@@ -452,6 +479,7 @@ def edit_bono(id_valoracion):
         currency       = request.form["currency"]
         rate_type      = request.form["rate_type"]
         capitalization = int(request.form["capitalization"]) if rate_type == "nominal" else None
+        start_date     = request.form["start_date"]
 
         db.execute(
             """
@@ -464,7 +492,8 @@ def edit_bono(id_valoracion):
                 precio_compra  = ?,
                 currency       = ?,
                 rate_type      = ?,
-                capitalization = ?
+                capitalization = ?,
+                start_date     = ?
             WHERE id_valoracion = ? AND user_id = ?
             """,
             (
@@ -477,6 +506,7 @@ def edit_bono(id_valoracion):
                 currency,
                 rate_type,
                 capitalization,
+                start_date,
                 id_valoracion,
                 session["user_id"],
             ),
@@ -500,17 +530,19 @@ def edit_bono(id_valoracion):
             precio_compra,
             rate_type,
             capitalization,
+            start_date,
         )
 
         for row in flujo:
             db.execute(
                 """INSERT INTO flujo_caja
-                    (valoracion_id, periodo, saldo_ini, cuota, interes,
+                    (valoracion_id, periodo, fecha_pago, saldo_ini, cuota, interes,
                      amortizacion, saldo_fin)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     id_valoracion,
                     row["periodo"],
+                    row["fecha_pago"],
                     row["saldo_ini"],
                     row["cuota"],
                     row["interes"],
